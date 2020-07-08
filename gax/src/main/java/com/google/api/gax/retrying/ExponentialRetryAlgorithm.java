@@ -43,6 +43,7 @@ import org.threeten.bp.Duration;
  */
 public class ExponentialRetryAlgorithm implements TimedRetryAlgorithm {
 
+  private static final double JITTER_FRACTION = 0.2;
   private final RetrySettings globalSettings;
   private final ApiClock clock;
 
@@ -50,7 +51,7 @@ public class ExponentialRetryAlgorithm implements TimedRetryAlgorithm {
    * Creates a new exponential retry algorithm instance.
    *
    * @param globalSettings global retry settings (attempt independent)
-   * @param clock clock to use for time-specific calculations
+   * @param clock          clock to use for time-specific calculations
    * @throws NullPointerException if either {@code globalSettings} or {@code clock} is null
    */
   public ExponentialRetryAlgorithm(RetrySettings globalSettings, ApiClock clock) {
@@ -150,18 +151,19 @@ public class ExponentialRetryAlgorithm implements TimedRetryAlgorithm {
     }
 
     // If maxAttempts limit is defined, check that it hasn't been crossed
-    if (maxAttempts > 0 && nextAttemptSettings.getAttemptCount() >= maxAttempts) {
-      return false;
-    }
+    return maxAttempts <= 0 || nextAttemptSettings.getAttemptCount() < maxAttempts;
 
     // No limits crossed
-    return true;
   }
 
   // Injecting Random is not possible here, as Random does not provide nextLong(long bound) method
   protected long nextRandomLong(long bound) {
-    return bound > 0 && globalSettings.isJittered()
-        ? ThreadLocalRandom.current().nextLong(bound)
+    // When jitter is enabled, choose a random value in (bound - bound * jitter_fraction, bound +
+    // bound* jitter_fraction)
+    long lowerBound = (long) (-bound * JITTER_FRACTION);
+    long upperBound = (long) (bound * JITTER_FRACTION);
+    return bound > 0 && lowerBound < upperBound && globalSettings.isJittered()
+        ? bound + ThreadLocalRandom.current().nextLong(lowerBound, upperBound)
         : bound;
   }
 }
