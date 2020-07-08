@@ -151,9 +151,12 @@ public class ExponentialRetryAlgorithm implements TimedRetryAlgorithm {
     }
 
     // If maxAttempts limit is defined, check that it hasn't been crossed
-    return maxAttempts <= 0 || nextAttemptSettings.getAttemptCount() < maxAttempts;
+    if (maxAttempts > 0 && nextAttemptSettings.getAttemptCount() >= maxAttempts) {
+      return false;
+    }
 
     // No limits crossed
+    return true;
   }
 
   // Injecting Random is not possible here, as Random does not provide nextLong(long bound) method
